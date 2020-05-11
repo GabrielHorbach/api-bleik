@@ -4,7 +4,6 @@ const SteamCommunity = require('steamcommunity');
 const TradeOfferManager = require('steam-tradeoffer-manager');
 
 const config = require('./config.json');
-const prices = require('./prices.json');
 
 const client = new SteamUser();
 const community = new SteamCommunity();
@@ -36,74 +35,37 @@ client.on('webSession', (sessionid, cookies) => {
 
   community.setCookies(cookies);
   community.startConfirmationChecker(20000, config.identitySecret);
+
+  sendFirstTradableItemFromInventory();
 });
 
-function acceptOffer(offer) {
-  offer.accept((e) => {
-    community.checkConfirmations();
-    if (e) {
-      console.log('erro em accept');
-      console.log(e);
-    }
-  })
-}
-
-function declineOffer(offer) {
-  offer.decline((e) => {
-    if (e) {
-      console.log('erro em decline');
-      console.log(e);
-    }
-  })
-}
-
-function processOffer(offer) {
-  console.log('Offer = ')
-  console.log(offer)
-  if (offer.isGlitched() || offer.state === 11) {
-    console.log('Offer was glitched, declining.');
-  } else if (offer.partner.getSteamID64() === config.ownerID) {
-    console.log('Auto accept the offer')
-    acceptOffer(offer);
-  } else {
-    let ourItems = offer.itemsToGive;
-    let theirItems = offer.itemsToReceive;
-    let ourValue = 0;
-    let theirValue = 0;
-
-    for (var i in ourItems) {
-      let item = ourItems[i].market_name;
-      if (prices[item]) {
-        ourValue += prices[item].sell;
-      } else {
-        console.log('Valor inválido');
-        ourValue += 9999990009;
-      }
-    }
-
-    for (var i in theirItems) {
-      let item = theirItems[i].market_name;
-      if (prices[item]) {
-        theirValue += prices[item].buy;
-      } else {
-        console.log('Valores diferentes.');
-      }
-    }
-    
-    console.log('ourValue = ' + ourValue);
-    console.log('theirValue = ' + theirValue);
-
-    if (ourValue <= theirValue) {
-      console.log('accept')
-      acceptOffer(offer);
+function sendFirstTradableItemFromInventory() {
+  manager.loadInventory(440, 2, true, (err, inventory) => {
+    if (err) {
+      console.log(err);
     } else {
-      console.log('decline')
-      declineOffer(offer);
-    }
-  }
-}
+      console.log("\n\n  ### Bruno's Inventory\n\n");
+      console.log(inventory);
+      console.log("\n\n");
 
-client.setOption('promptSteamGuardCode', false);
-manager.on('newOffer', (offer) => {
-  processOffer(offer);
-});
+      //create an offer using daniel steamID, but can be used a token also
+      const offer = manager.createOffer('76561198085122883');
+      const itemSelected = inventory[0];
+      offer.addMyItem(itemSelected);
+
+      console.log("### Item selected ###\n\n");
+      console.log(itemSelected);
+
+      offer.setMessage('Item enviado do server!');
+      offer.send((err, status) => {
+        if (err) {
+          console.log("### ERROR ###")
+          console.log(err);
+        } else {
+          console.log("### Trade sent! ###");
+          console.log(status);
+        }
+      });
+    }
+  });
+}
